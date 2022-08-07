@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "ISBN Scanner",
+    "slug": "isbn-scanner",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/favicon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/favicon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.zaki_dz.isbnscanner"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
