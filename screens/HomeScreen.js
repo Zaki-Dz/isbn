@@ -18,97 +18,82 @@ import "react-native-reanimated";
 import { MotiView } from "moti";
 import scanning from "../assets/scanning-animation.gif";
 
+import { ref, set, onValue, update, increment } from "firebase/database";
+import { db, auth } from "../firebase";
+
 const Home = ({ route }) => {
-	const [finalData, setFinalData] = useState([]);
-	const [book, setBook] = useState();
-	const [arrivedQuantity, setArrivedQuantity] = useState(null);
-	const [scannedQuantity, setScannedQuantity] = useState(0);
 	const [ISBN, setISBN] = useState();
+	const [book, setBook] = useState();
+	const [clients, setClients] = useState([]);
+	const [arrivedQuantity, setArrivedQuantity] = useState(0);
 
-	const [newFinalData, setNewFinalData] = useState([]);
-	const [newISBN, setNewISBN] = useState();
-	const [newArrivedQuantity, setNewArrivedQuantity] = useState(0);
-
-	const [hasPermission, setHasPermission] = useState(null);
 	const [scanned, setScanned] = useState(false);
 
 	const [modalVisibility, setModalVisibility] = useState(false);
+	const [newISBN, setNewISBN] = useState();
+	const [newArrivedQuantity, setNewArrivedQuantity] = useState();
 
-	const storeData = async (value) => {
-		const jsonValue = JSON.stringify(value);
+	useEffect(() => {
+		const reference = ref(db, "books/" + ISBN);
 
-		await AsyncStorage.setItem("fileData", jsonValue);
-	};
+		onValue(reference, (snapshot) => {
+			const data = snapshot.val();
 
-	const storeNewData = async (value) => {
-		const jsonValue = JSON.stringify(value);
-
-		await AsyncStorage.setItem("newFileData", jsonValue);
-	};
-
-	const getNewData = async () => {
-		const jsonValue = await AsyncStorage.getItem("newFileData");
-
-		return jsonValue != null ? JSON.parse(jsonValue) : null;
-	};
+			setBook(data);
+		});
+	}, [ISBN]);
 
 	const handleBarCodeScanned = ({ type, data }) => {
 		setScanned(true);
 
-		let ended = false;
+		const reference = ref(db, "books/" + data);
 
-		let founded = false;
+		onValue(reference, (snapshot) => {
+			const res = snapshot.val();
 
-		route.params.allBooks.map((item, i) => {
-			if (item.ISBN == data) {
-				setBook(item);
+			if (res) {
+				setISBN(res.ISBN);
 
-				setArrivedQuantity(item["QTE LIV"]);
+				setClients([]);
 
-				setISBN(data);
-
-				founded = true;
-			}
-
-			if (route.params.allBooks.length - 1 == i) {
-				ended = true;
+				res?.CLIENT.split("+").map((client) =>
+					setClients((prev) => [
+						...prev,
+						{ name: client.split("/")[1], qte: client.split("/")[0] },
+					])
+				);
+			} else {
+				setModalVisibility(true);
 			}
 		});
-
-		if (ended && !founded) {
-			setModalVisibility(true);
-		}
 	};
 
 	const handleQuantity = (e) => {
 		setArrivedQuantity(e);
-
-		setScannedQuantity(e);
 	};
 
 	const handleButton = () => {
-		book &&
-			route.params.allBooks.map((item) => {
-				if (item.ISBN == book.ISBN) {
-					item.ARRIVED_QTE = arrivedQuantity;
+		let total = arrivedQuantity;
 
-					return item;
-				}
+		const reference = ref(db, "books/" + book.ISBN);
+
+		if (total) {
+			update(reference, {
+				ARRIVED_QTE: increment(parseInt(total)),
 			});
+		} else {
+			update(reference, {
+				ARRIVED_QTE: book.QTE,
+			});
+		}
 
 		Keyboard.dismiss();
 
-		storeData(route.params.allBooks);
-
-		setFinalData(route.params.allBooks);
+		setArrivedQuantity();
 
 		setScanned(false);
 
 		setBook();
-
-		setArrivedQuantity(null);
-
-		setScannedQuantity(0);
 
 		setISBN();
 	};
@@ -117,69 +102,37 @@ const Home = ({ route }) => {
 		setModalVisibility(false);
 		setScanned(false);
 
-		let ended = false;
-
-		let founded = false;
-
 		Keyboard.dismiss();
 
-		// parcourer l file li kayen ida fih wela lala
-		route.params.allBooks.map((item, i) => {
-			if (item.ISBN == newISBN) {
-				setBook(item);
+		let reference = ref(db, "books/" + newISBN);
 
-				setArrivedQuantity(item["QTE LIV"]);
+		let res;
 
-				setISBN(newISBN);
-
-				founded = true;
-			}
-
-			if (route.params.allBooks.length - 1 == i) {
-				ended = true;
-			}
+		onValue(reference, (snapshot) => {
+			res = snapshot.val();
 		});
 
-		if (ended && !founded) {
-			let data = { ISBN: newISBN, "QTE LIV": newArrivedQuantity };
-
-			// chof ida kayen file ta3 not found wela makach
-			getNewData().then((res) => {
-				let innerEnded = false;
-
-				let innerFounded = false;
-
-				if (res && res.length != 0) {
-					// ida kayen nparcourih ou nchof ida fih isbn li ktebto
-					res.map((item, i) => {
-						if (item.ISBN == newISBN) {
-							item["QTE LIV"] =
-								parseInt(item["QTE LIV"]) + parseInt(newArrivedQuantity);
-
-							innerFounded = true;
-						}
-
-						if (res.length - 1 == i) {
-							innerEnded = true;
-						}
-					});
-
-					if (innerEnded && !innerFounded) {
-						storeNewData([...res, data]);
-
-						setNewFinalData([...res, data]);
-					} else {
-						storeNewData(res);
-
-						setNewFinalData(res);
-					}
-				} else {
-					// ida makach nekhdem file jdid ou ndir data dakhlo
-					setNewFinalData([data]);
-
-					storeNewData([data]);
-				}
+		if (res) {
+			update(reference, {
+				ARRIVED_QTE: increment(parseInt(newArrivedQuantity)),
 			});
+		} else {
+			reference = ref(db, "notFound/" + newISBN);
+
+			onValue(reference, (snapshot) => {
+				res = snapshot.val();
+			});
+
+			if (res) {
+				update(reference, {
+					ARRIVED_QTE: increment(parseInt(newArrivedQuantity)),
+				});
+			} else {
+				set(reference, {
+					ISBN: newISBN,
+					ARRIVED_QTE: parseInt(newArrivedQuantity),
+				});
+			}
 		}
 	};
 
@@ -202,7 +155,7 @@ const Home = ({ route }) => {
 						<SInput
 							type="number"
 							placeholder="Quantity"
-							onChangeText={(e) => setNewArrivedQuantity(e)}
+							onChangeText={(e) => setNewArrivedQuantity(parseInt(e))}
 							keyboardType="numeric"
 						/>
 
@@ -236,6 +189,10 @@ const Home = ({ route }) => {
 				</Pressable>
 			</ScannerContainer>
 
+			<Add onPress={() => setModalVisibility(true)}>
+				<ButtonText size={2}>+</ButtonText>
+			</Add>
+
 			<Content>
 				<SInput
 					type="number"
@@ -256,22 +213,18 @@ const Home = ({ route }) => {
 						</SButton>
 
 						<Card>
-							<Result>{book.TITRE}</Result>
+							<Result>{book.TITLE}</Result>
 						</Card>
 
 						<Card>
-							<Result size={2}>
-								{book.ARRIVED_QTE == null
-									? 0 + " / " + book["QTE LIV"]
-									: book.ARRIVED_QTE + " / " + book["QTE LIV"]}
-							</Result>
+							<Result size={2}>{book.ARRIVED_QTE + " / " + book.QTE}</Result>
 						</Card>
 
 						<Card style={{ flexDirection: "column" }}>
-							{book["CODE CLIENT"].split("+").map((client) => {
+							{clients.map((client) => {
 								let size;
 
-								let len = book["CODE CLIENT"].split("+").length;
+								let len = clients.length;
 
 								if (len == 1) {
 									size = 3;
@@ -281,21 +234,39 @@ const Home = ({ route }) => {
 									size = 1;
 								}
 
-								return (
-									<Result color="red" size={size}>
-										{len > 1
-											? client.split("/")[1] + " = " + client.split("/")[0]
-											: client}
-									</Result>
-								);
+								let result;
+
+								let total = book.ARRIVED_QTE;
+
+								if (total > client.qte) {
+									total -= client.qte;
+
+									result = (
+										<Result key={client} color="red" size={size}>
+											{client.name + " = " + client.qte + "/" + client.qte}
+										</Result>
+									);
+								} else {
+									result = (
+										<Result key={client} color="red" size={size}>
+											{client.name + " = " + total + "/" + client.qte}
+										</Result>
+									);
+
+									total = 0;
+								}
+
+								return result;
 							})}
 						</Card>
 					</MotiView>
 				) : (
-					<Image
-						source={scanning}
-						style={{ width: 100, height: 100, alignSelf: "center" }}
-					/>
+					// <Image
+					// 	source={scanning}
+					// 	style={{ width: 100, height: 100, alignSelf: "center" }}
+					// />
+
+					<Text></Text>
 				)}
 			</Content>
 		</SHome>
@@ -362,6 +333,19 @@ const SInput = styled.TextInput`
 	align-self: stretch;
 `;
 
+const Add = styled.Pressable`
+	position: absolute;
+	background-color: dodgerblue;
+	top: 20px;
+	right: 20px;
+	border-radius: 50px;
+	width: 50px;
+	height: 50px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+`;
+
 const SButton = styled.TouchableOpacity`
 	background-color: ${(props) =>
 		props.success ? "#119fe1" : props.ok ? "#1cc38f" : "#011a53"};
@@ -372,6 +356,7 @@ const SButton = styled.TouchableOpacity`
 `;
 
 const ButtonText = styled.Text`
+	font-size: ${(props) => (props.size ? props.size * 16 + "px" : "16px")};
 	color: white;
 	text-align: center;
 	text-transform: uppercase;

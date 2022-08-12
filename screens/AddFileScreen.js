@@ -19,8 +19,10 @@ import "react-native-reanimated";
 import { MotiView, MotiImage } from "moti";
 import FaviconImage from "../assets/favicon.png";
 
+import { ref, set, onValue, update, increment } from "firebase/database";
+import { db, auth } from "../firebase";
+
 const AddFileScreen = ({ navigation }) => {
-	const [allBooks, setAllBooks] = useState();
 	const [thereIsCachedFile, setThereIsCachedFile] = useState(false);
 	const [thereIsNotFoundFile, setThereIsNotFoundFile] = useState(false);
 
@@ -37,36 +39,24 @@ const AddFileScreen = ({ navigation }) => {
 	const [existingFileModalVisibility, setExistingFileModalVisibility] =
 		useState(false);
 
-	const storeData = async (value) => {
-		const jsonValue = JSON.stringify(value);
-
-		await AsyncStorage.setItem("fileData", jsonValue);
-	};
-
-	const getData = async () => {
-		const jsonValue = await AsyncStorage.getItem("fileData");
-
-		return jsonValue != null ? JSON.parse(jsonValue) : null;
-	};
-
-	const storeNewData = async (value) => {
-		const jsonValue = JSON.stringify(value);
-
-		await AsyncStorage.setItem("newFileData", jsonValue);
-	};
-
-	const getNewData = async () => {
-		const jsonValue = await AsyncStorage.getItem("newFileData");
-
-		return jsonValue != null ? JSON.parse(jsonValue) : null;
-	};
-
 	useEffect(() => {
-		getData().then((res) => res && setThereIsCachedFile(true));
+		const reference = ref(db, "books/");
+
+		onValue(reference, (snapshot) => {
+			const data = snapshot.val();
+
+			data ? setThereIsCachedFile(true) : setThereIsCachedFile(false);
+		});
 	}, [thereIsCachedFile]);
 
 	useEffect(() => {
-		getNewData().then((res) => res && setThereIsNotFoundFile(true));
+		const reference = ref(db, "notFound/");
+
+		onValue(reference, (snapshot) => {
+			const data = snapshot.val();
+
+			data ? setThereIsNotFoundFile(true) : setThereIsNotFoundFile(false);
+		});
 	}, [thereIsNotFoundFile]);
 
 	// trigerred on click
@@ -93,19 +83,19 @@ const AddFileScreen = ({ navigation }) => {
 				workbook.Sheets[sheet]
 			);
 
-			let finalData = rowObject;
+			rowObject.map((element) => {
+				const reference = ref(db, "books/" + element.ISBN);
 
-			storeData(finalData);
+				set(reference, {
+					CLIENT: element["CODE CLIENT"],
+					ISBN: element.ISBN,
+					QTE: element["QTE LIV"],
+					TITLE: element.TITRE,
+					ARRIVED_QTE: 0,
+				});
+			});
 
-			setAllBooks(finalData);
-
-			setThereIsCachedFile(true);
-
-			setThereIsNotFoundFile(true);
-
-			storeNewData(null);
-
-			navigation.navigate("Scanner", { allBooks: finalData });
+			navigation.navigate("Scanner");
 		});
 	};
 
@@ -114,21 +104,11 @@ const AddFileScreen = ({ navigation }) => {
 	};
 
 	const handleExistingFileButton = async () => {
-		let storedData;
-		await getData().then((res) => (storedData = res));
-
-		storedData == null
-			? alert("Aucun fichier existant trouvé!")
-			: await navigation.navigate("Scanner", { allBooks: storedData });
+		navigation.navigate("Scanner");
 	};
 
 	const handleConsultButton = async () => {
-		let storedData;
-		await getData().then((res) => (storedData = res));
-
-		storedData == null
-			? alert("Aucun fichier existant trouvé!")
-			: await navigation.navigate("Consult", { allBooks: storedData });
+		navigation.navigate("Consult");
 	};
 
 	// function to handle exporting
@@ -160,12 +140,23 @@ const AddFileScreen = ({ navigation }) => {
 		if (!name || !reference) {
 			alert("Nom ou Référence sont vide!");
 		} else {
-			let storedData;
-			await getData().then((res) => (storedData = res));
+			const reference = ref(db, "books/");
 
-			storedData == null
-				? alert("Aucun fichier trouvé!")
-				: exportDataToExcel(storedData, name + "-" + reference);
+			let res = [];
+
+			onValue(reference, (snapshot) => {
+				let data = snapshot.val();
+
+				for (const key in data) {
+					res.push(data[key]);
+				}
+			});
+
+			if (res) {
+				exportDataToExcel(res, nameNew + "-" + referenceNew);
+			} else {
+				alert("Aucun fichier trouvé!");
+			}
 		}
 
 		setName(null);
@@ -180,15 +171,23 @@ const AddFileScreen = ({ navigation }) => {
 		if (!nameNew || !referenceNew) {
 			alert("Nom ou Référence sont vide!");
 		} else {
-			let storedData;
-			await getNewData().then((res) => (storedData = res));
+			const reference = ref(db, "notFound/");
 
-			storedData == null || storedData.length == 0
-				? alert("Aucun fichier trouvé!")
-				: exportDataToExcel(
-						storedData,
-						nameNew + "-" + referenceNew + "-Not-Found"
-				  );
+			let res = [];
+
+			onValue(reference, (snapshot) => {
+				let data = snapshot.val();
+
+				for (const key in data) {
+					res.push(data[key]);
+				}
+			});
+
+			if (res) {
+				exportDataToExcel(res, nameNew + "-" + referenceNew + "-Not-Found");
+			} else {
+				alert("Aucun fichier trouvé!");
+			}
 		}
 
 		setNameNew(null);

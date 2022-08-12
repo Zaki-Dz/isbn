@@ -1,53 +1,62 @@
 import { useState, useEffect } from "react";
-import { StatusBar, Image, Modal } from "react-native";
+import { StatusBar, Image, Modal, Text } from "react-native";
 import styled from "styled-components/native";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import "react-native-reanimated";
 import { MotiView } from "moti";
 import scanning from "../assets/scanning-animation.gif";
 
-const ConsultScreen = ({ route }) => {
-  const [book, setBook] = useState();
+import { ref, set, onValue, update, increment } from "firebase/database";
+import { db, auth } from "../firebase";
 
-  const [hasPermission, setHasPermission] = useState(null);
+const ConsultScreen = ({ route }) => {
+  const [ISBN, setISBN] = useState();
+  const [book, setBook] = useState();
+  const [clients, setClients] = useState([]);
+
   const [scanned, setScanned] = useState(false);
 
   const [modalVisibility, setModalVisibility] = useState(false);
 
+  useEffect(() => {
+    const reference = ref(db, "books/" + ISBN);
+
+    onValue(reference, (snapshot) => {
+      const data = snapshot.val();
+
+      setBook(data);
+    });
+  }, [ISBN]);
+
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
 
-    let ended = false;
+    const reference = ref(db, "books/" + data);
 
-    let founded = false;
+    onValue(reference, (snapshot) => {
+      const data = snapshot.val();
 
-    route.params.allBooks.map((item, i) => {
-      if (item.ISBN == data) {
-        setBook(item);
+      if (data) {
+        setISBN(data.ISBN);
 
-        founded = true;
-      }
+        setClients([]);
 
-      if (route.params.allBooks.length - 1 == i) {
-        ended = true;
+        data?.CLIENT.split("+").map((client) =>
+          setClients((prev) => [
+            ...prev,
+            { name: client.split("/")[1], qte: client.split("/")[0] },
+          ])
+        );
+      } else {
+        setModalVisibility(true);
       }
     });
-
-    if (ended && !founded) {
-      setModalVisibility(true);
-    }
   };
 
   const handleButton = () => {
-    book &&
-      route.params.allBooks.map((item) => {
-        if (item.ISBN == book.ISBN) {
-          return item;
-        }
-      });
-
     setScanned(false);
 
+    setISBN();
     setBook();
   };
 
@@ -83,7 +92,7 @@ const ConsultScreen = ({ route }) => {
       </ScannerContainer>
 
       <Content>
-        {book ? (
+        {book && (
           <MotiView
             from={{ scale: 0 }}
             animate={{ scale: scanned ? 1 : 0 }}
@@ -94,22 +103,18 @@ const ConsultScreen = ({ route }) => {
             </SButton>
 
             <Card>
-              <Result>{book.TITRE}</Result>
+              <Result>{book.TITLE}</Result>
             </Card>
 
             <Card>
-              <Result size={2}>
-                {book.ARRIVED_QTE == null
-                  ? 0 + " / " + book["QTE LIV"]
-                  : book.ARRIVED_QTE + " / " + book["QTE LIV"]}
-              </Result>
+              <Result size={2}>{book.ARRIVED_QTE + " / " + book.QTE}</Result>
             </Card>
 
             <Card style={{ flexDirection: "column" }}>
-              {book["CODE CLIENT"].split("+").map((client) => {
+              {clients.map((client) => {
                 let size;
 
-                let len = book["CODE CLIENT"].split("+").length;
+                let len = clients.length;
 
                 if (len == 1) {
                   size = 3;
@@ -119,21 +124,32 @@ const ConsultScreen = ({ route }) => {
                   size = 1;
                 }
 
-                return (
-                  <Result color="red" size={size}>
-                    {len > 1
-                      ? client.split("/")[1] + " = " + client.split("/")[0]
-                      : client}
-                  </Result>
-                );
+                let result;
+
+                let total = book.ARRIVED_QTE;
+
+                if (total > client.qte) {
+                  total -= client.qte;
+
+                  result = (
+                    <Result key={client} color="red" size={size}>
+                      {client.name + " = " + client.qte + "/" + client.qte}
+                    </Result>
+                  );
+                } else {
+                  result = (
+                    <Result key={client} color="red" size={size}>
+                      {client.name + " = " + total + "/" + client.qte}
+                    </Result>
+                  );
+
+                  total = 0;
+                }
+
+                return result;
               })}
             </Card>
           </MotiView>
-        ) : (
-          <Image
-            source={scanning}
-            style={{ width: 100, height: 100, alignSelf: "center" }}
-          />
         )}
       </Content>
     </SHome>
