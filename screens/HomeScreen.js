@@ -26,6 +26,7 @@ const Home = ({ route }) => {
 	const [book, setBook] = useState();
 	const [clients, setClients] = useState([]);
 	const [arrivedQuantity, setArrivedQuantity] = useState(0);
+	const [last, setLast] = useState(0);
 
 	const [scanned, setScanned] = useState(false);
 
@@ -40,6 +41,8 @@ const Home = ({ route }) => {
 			const data = snapshot.val();
 
 			setBook(data);
+
+			setLast(data?.LAST);
 		});
 	}, [ISBN]);
 
@@ -70,20 +73,51 @@ const Home = ({ route }) => {
 
 	const handleQuantity = (e) => {
 		setArrivedQuantity(e);
-	};
-
-	const handleButton = () => {
-		let total = arrivedQuantity;
 
 		const reference = ref(db, "books/" + book.ISBN);
 
-		if (total) {
+		let total;
+
+		onValue(reference, (snapshot) => {
+			let data = snapshot.val();
+
+			total = data.ARRIVED_QTE;
+		});
+
+		total += parseInt(e);
+
+		clients.map((client) => {
+			if (total >= client.qte) {
+				console.log(client.name + " = " + client.qte + " / " + client.qte);
+
+				total -= client.qte;
+			} else {
+				console.log(client.name + " = " + total + " / " + client.qte);
+
+				total = 0;
+			}
+		});
+	};
+
+	const handleButton = () => {
+		let total = parseInt(arrivedQuantity);
+
+		const reference = ref(db, "books/" + book.ISBN);
+
+		if (total > 0) {
 			update(reference, {
-				ARRIVED_QTE: increment(parseInt(total)),
+				ARRIVED_QTE: increment(total),
+				LAST: total,
+			});
+		} else if (total < 0) {
+			update(reference, {
+				ARRIVED_QTE: increment(total),
+				LAST: increment(total),
 			});
 		} else {
 			update(reference, {
 				ARRIVED_QTE: book.QTE,
+				LAST: parseInt(book.QTE),
 			});
 		}
 
@@ -91,11 +125,11 @@ const Home = ({ route }) => {
 
 		setArrivedQuantity();
 
-		setScanned(false);
-
 		setBook();
 
 		setISBN();
+
+		setScanned(false);
 	};
 
 	const handleNewButton = () => {
@@ -193,6 +227,12 @@ const Home = ({ route }) => {
 				<ButtonText size={2}>+</ButtonText>
 			</Add>
 
+			<Last>
+				<Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
+					{last}
+				</Text>
+			</Last>
+
 			<Content>
 				<SInput
 					type="number"
@@ -218,46 +258,6 @@ const Home = ({ route }) => {
 
 						<Card>
 							<Result size={2}>{book.ARRIVED_QTE + " / " + book.QTE}</Result>
-						</Card>
-
-						<Card style={{ flexDirection: "column" }}>
-							{clients.map((client) => {
-								let size;
-
-								let len = clients.length;
-
-								if (len == 1) {
-									size = 3;
-								} else if (len == 2) {
-									size = 2;
-								} else if (len > 2) {
-									size = 1;
-								}
-
-								let result;
-
-								let total = book.ARRIVED_QTE;
-
-								if (total > client.qte) {
-									total -= client.qte;
-
-									result = (
-										<Result key={client} color="red" size={size}>
-											{client.name + " = " + client.qte + "/" + client.qte}
-										</Result>
-									);
-								} else {
-									result = (
-										<Result key={client} color="red" size={size}>
-											{client.name + " = " + total + "/" + client.qte}
-										</Result>
-									);
-
-									total = 0;
-								}
-
-								return result;
-							})}
 						</Card>
 					</MotiView>
 				) : (
@@ -335,9 +335,26 @@ const SInput = styled.TextInput`
 
 const Add = styled.Pressable`
 	position: absolute;
-	background-color: dodgerblue;
-	top: 20px;
+	border-color: white;
+	border-style: solid;
+	border-width: 1px;
+	top: 50px;
 	right: 20px;
+	border-radius: 50px;
+	width: 50px;
+	height: 50px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+`;
+
+const Last = styled.View`
+	position: absolute;
+	border-color: white;
+	border-style: solid;
+	border-width: 1px;
+	top: 50px;
+	left: 20px;
 	border-radius: 50px;
 	width: 50px;
 	height: 50px;

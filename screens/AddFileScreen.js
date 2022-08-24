@@ -92,6 +92,7 @@ const AddFileScreen = ({ navigation }) => {
 					QTE: element["QTE LIV"],
 					TITLE: element.TITRE,
 					ARRIVED_QTE: 0,
+					LAST: 0,
 				});
 			});
 
