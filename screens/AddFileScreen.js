@@ -19,7 +19,14 @@ import "react-native-reanimated";
 import { MotiView, MotiImage } from "moti";
 import FaviconImage from "../assets/favicon.png";
 
-import { ref, set, onValue, update, increment } from "firebase/database";
+import {
+	ref,
+	set,
+	remove,
+	onValue,
+	update,
+	increment,
+} from "firebase/database";
 import { db, auth } from "../firebase";
 
 const AddFileScreen = ({ navigation }) => {
@@ -76,6 +83,8 @@ const AddFileScreen = ({ navigation }) => {
 		let workbook = XLSX.read(base64.decode(res), {
 			type: "binary",
 		});
+
+		remove(ref(db, "books/"));
 
 		// looping through every row of the excel file and convert it to json
 		workbook.SheetNames.forEach((sheet) => {

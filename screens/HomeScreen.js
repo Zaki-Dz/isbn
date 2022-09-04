@@ -24,7 +24,6 @@ import { db, auth } from "../firebase";
 const Home = ({ route }) => {
 	const [ISBN, setISBN] = useState();
 	const [book, setBook] = useState();
-	const [clients, setClients] = useState([]);
 	const [arrivedQuantity, setArrivedQuantity] = useState(0);
 	const [last, setLast] = useState(0);
 
@@ -56,15 +55,6 @@ const Home = ({ route }) => {
 
 			if (res) {
 				setISBN(res.ISBN);
-
-				setClients([]);
-
-				res?.CLIENT.split("+").map((client) =>
-					setClients((prev) => [
-						...prev,
-						{ name: client.split("/")[1], qte: client.split("/")[0] },
-					])
-				);
 			} else {
 				setModalVisibility(true);
 			}
@@ -73,53 +63,15 @@ const Home = ({ route }) => {
 
 	const handleQuantity = (e) => {
 		setArrivedQuantity(e);
-
-		const reference = ref(db, "books/" + book.ISBN);
-
-		let total;
-
-		onValue(reference, (snapshot) => {
-			let data = snapshot.val();
-
-			total = data.ARRIVED_QTE;
-		});
-
-		total += parseInt(e);
-
-		clients.map((client) => {
-			if (total >= client.qte) {
-				console.log(client.name + " = " + client.qte + " / " + client.qte);
-
-				total -= client.qte;
-			} else {
-				console.log(client.name + " = " + total + " / " + client.qte);
-
-				total = 0;
-			}
-		});
 	};
 
 	const handleButton = () => {
 		let total = parseInt(arrivedQuantity);
 
-		const reference = ref(db, "books/" + book.ISBN);
-
-		if (total > 0) {
-			update(reference, {
-				ARRIVED_QTE: increment(total),
-				LAST: total,
-			});
-		} else if (total < 0) {
-			update(reference, {
-				ARRIVED_QTE: increment(total),
-				LAST: increment(total),
-			});
-		} else {
-			update(reference, {
-				ARRIVED_QTE: book.QTE,
-				LAST: parseInt(book.QTE),
-			});
-		}
+		update(ref(db, "books/" + book.ISBN), {
+			ARRIVED_QTE: increment(total),
+			LAST: total,
+		});
 
 		Keyboard.dismiss();
 
@@ -266,7 +218,7 @@ const Home = ({ route }) => {
 					// 	style={{ width: 100, height: 100, alignSelf: "center" }}
 					// />
 
-					<Text></Text>
+					<Text>Scanning...</Text>
 				)}
 			</Content>
 		</SHome>
