@@ -6,7 +6,15 @@ import "react-native-reanimated";
 import { MotiView } from "moti";
 import scanning from "../assets/scanning-animation.gif";
 
-import { ref, set, onValue, update, increment } from "firebase/database";
+import {
+  ref,
+  set,
+  get,
+  onValue,
+  child,
+  update,
+  increment,
+} from "firebase/database";
 import { db, auth } from "../firebase";
 
 const ConsultScreen = ({ route }) => {
@@ -22,90 +30,108 @@ const ConsultScreen = ({ route }) => {
     if (scanned) {
       const reference = ref(db, "books/" + ISBN);
 
-      onValue(reference, (snapshot) => {
-        const data = snapshot.val();
+      // get(child(db, "books/" + ISBN))
+      //   .then((snapshot) => {
+      //     if (snapshot.exists()) {
+      //       console.log(snapshot.val());
+      //     } else {
+      //       console.log("No data available");
+      //     }
+      //   })
+      //   .catch((error) => {
+      //     console.error(error);
+      //   });
 
-        setBook(data);
+      onValue(
+        reference,
+        (snapshot) => {
+          const data = snapshot.val();
 
-        if (data) {
-          setISBN(data.ISBN);
+          setBook(data);
 
-          setClients([]);
+          if (data) {
+            setISBN(data.ISBN);
 
-          let total = data.ARRIVED_QTE;
+            setClients([]);
 
-          let last = data.LAST;
+            let total = data.ARRIVED_QTE;
 
-          let done = total != last ? total - last : total;
+            let last = data.LAST;
 
-          let forCalculation = done;
+            let done = total != last ? total - last : 0;
 
-          let need = 0;
+            let forCalculation = done;
 
-          console.log("===========LOOP===========");
+            let need = 0;
 
-          data?.CLIENT.split("+").map((client) => {
-            let clientName = client.split("/")[1];
+            console.log("===========LOOP===========");
 
-            let clientQTE = client.split("/")[0];
+            data?.CLIENT.split("+").map((client) => {
+              let clientName = client.split("/")[1];
 
-            if (forCalculation >= clientQTE) {
-              // if client got all his books
-              forCalculation -= clientQTE; // removing what he got
+              let clientQTE = client.split("/")[0];
 
-              let X = need;
+              if (forCalculation >= clientQTE) {
+                // if client got all his books
+                forCalculation -= clientQTE; // removing what he got
 
-              setClients((prev) => [
-                ...prev,
-                { name: clientName, qte: clientQTE, done: true, need: X },
-              ]);
-
-              console.log("forCalculation >= clientQTE");
-
-              console.log(clientName + " = " + "need " + X);
-            } else if (forCalculation < clientQTE) {
-              // if he did not get all his books
-              need = clientQTE - forCalculation; // calculating how much he need
-
-              forCalculation = 0;
-
-              if (last >= need) {
-                // if you have more books in your hand mor than he need or equal
-
-                let X = need;
+                const X = need;
 
                 setClients((prev) => [
                   ...prev,
-                  { name: clientName, qte: clientQTE, done: false, need: X },
+                  { name: clientName, qte: clientQTE, done: true, need: X },
                 ]);
 
-                console.log("last >= need");
+                console.log("forCalculation >= clientQTE");
 
                 console.log(clientName + " = " + "need " + X);
+              } else if (forCalculation < clientQTE) {
+                // if he did not get all his books
+                need = clientQTE - forCalculation; // calculating how much he need
 
-                last -= need; // removing what he got
-              } else if (last < need) {
-                // if he need more than you have in your hand
-                // give him all what you have
-                let X = last;
+                forCalculation = 0;
 
-                setClients((prev) => [
-                  ...prev,
-                  { name: clientName, qte: clientQTE, done: false, need: X },
-                ]);
+                if (last >= need) {
+                  // if you have more books in your hand than he need or equal
 
-                console.log("last < need");
+                  const X = need;
 
-                console.log(clientName + " = " + "need " + X);
+                  setClients((prev) => [
+                    ...prev,
+                    { name: clientName, qte: clientQTE, done: false, need: X },
+                  ]);
 
-                last = 0;
+                  console.log("last >= need");
+
+                  console.log(clientName + " = " + "need " + X);
+
+                  last -= need; // removing what he got
+                } else if (last < need) {
+                  // if he need more than you have in your hand
+                  // give him all what you have
+                  const X = last;
+
+                  setClients((prev) => [
+                    ...prev,
+                    { name: clientName, qte: clientQTE, done: false, need: X },
+                  ]);
+
+                  console.log("last < need");
+
+                  console.log(clientName + " = " + "need " + X);
+
+                  last = 0;
+                }
               }
-            }
-          });
-        } else {
-          setModalVisibility(true);
+            });
+          } else {
+            setModalVisibility(true);
+          }
+        },
+        {
+          onlyOnce: true,
         }
-      });
+      );
     }
   }, [ISBN]);
 
