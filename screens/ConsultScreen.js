@@ -30,18 +30,6 @@ const ConsultScreen = ({ route }) => {
     if (scanned) {
       const reference = ref(db, "books/" + ISBN);
 
-      // get(child(db, "books/" + ISBN))
-      //   .then((snapshot) => {
-      //     if (snapshot.exists()) {
-      //       console.log(snapshot.val());
-      //     } else {
-      //       console.log("No data available");
-      //     }
-      //   })
-      //   .catch((error) => {
-      //     console.error(error);
-      //   });
-
       onValue(
         reference,
         (snapshot) => {
@@ -64,12 +52,79 @@ const ConsultScreen = ({ route }) => {
 
             let need = 0;
 
-            console.log("===========LOOP===========");
+            if (data?.CLIENT.split("+").length > 1) {
+              data?.CLIENT.split("+").map((client) => {
+                let clientName = client.split("/")[1];
 
-            data?.CLIENT.split("+").map((client) => {
-              let clientName = client.split("/")[1];
+                let clientQTE = client.split("/")[0];
 
-              let clientQTE = client.split("/")[0];
+                if (forCalculation >= clientQTE) {
+                  // if client got all his books
+                  forCalculation -= clientQTE; // removing what he got
+
+                  const X = need;
+
+                  setClients((prev) => [
+                    ...prev,
+                    { name: clientName, qte: clientQTE, done: true, need: X },
+                  ]);
+                } else if (forCalculation < clientQTE) {
+                  // if he did not get all his books
+                  need = clientQTE - forCalculation; // calculating how much he need
+
+                  forCalculation = 0;
+
+                  if (last >= need) {
+                    // if you have more books in your hand than he need or equal
+
+                    const X = need;
+
+                    setClients((prev) => [
+                      ...prev,
+                      {
+                        name: clientName,
+                        qte: clientQTE,
+                        done: false,
+                        need: X,
+                      },
+                    ]);
+
+                    last -= need; // removing what he got
+                  } else if (last < need) {
+                    // if he need more than you have in your hand
+                    // give him all what you have
+                    const X = last;
+
+                    setClients((prev) => [
+                      ...prev,
+                      {
+                        name: clientName,
+                        qte: clientQTE,
+                        done: false,
+                        need: X,
+                      },
+                    ]);
+
+                    last = 0;
+                  }
+                }
+              });
+            } else {
+              let clientName = data.CLIENT.split("+")[0];
+
+              let clientQTE = data.ARRIVED_QTE;
+
+              setClients([]);
+
+              let total = data.ARRIVED_QTE;
+
+              let last = data.LAST;
+
+              let done = total != last ? total - last : 0;
+
+              let forCalculation = done;
+
+              let need = 0;
 
               if (forCalculation >= clientQTE) {
                 // if client got all his books
@@ -82,28 +137,39 @@ const ConsultScreen = ({ route }) => {
                   { name: clientName, qte: clientQTE, done: true, need: X },
                 ]);
 
-                console.log("forCalculation >= clientQTE");
+                console.log("DA 7A9O");
 
-                console.log(clientName + " = " + "need " + X);
+                console.log("name " + clientName);
+                console.log("QTE " + clientQTE);
+                console.log("need " + X);
               } else if (forCalculation < clientQTE) {
                 // if he did not get all his books
-                need = clientQTE - forCalculation; // calculating how much he need
+                // need = clientQTE - forCalculation; // calculating how much he need
+
+                need = data.QTE - forCalculation; // calculating how much he need
 
                 forCalculation = 0;
 
-                if (last >= need) {
+                if (last >= need && need > 0) {
                   // if you have more books in your hand than he need or equal
 
                   const X = need;
 
                   setClients((prev) => [
                     ...prev,
-                    { name: clientName, qte: clientQTE, done: false, need: X },
+                    {
+                      name: clientName,
+                      qte: clientQTE,
+                      done: false,
+                      need: X,
+                    },
                   ]);
 
-                  console.log("last >= need");
+                  console.log("3ANDEK KTABAT KTER MELI YES7A9");
 
-                  console.log(clientName + " = " + "need " + X);
+                  console.log("name " + clientName);
+                  console.log("QTE " + clientQTE);
+                  console.log("need " + X);
 
                   last -= need; // removing what he got
                 } else if (last < need) {
@@ -113,19 +179,36 @@ const ConsultScreen = ({ route }) => {
 
                   setClients((prev) => [
                     ...prev,
-                    { name: clientName, qte: clientQTE, done: false, need: X },
+                    {
+                      name: clientName,
+                      qte: clientQTE,
+                      done: false,
+                      need: X,
+                    },
                   ]);
 
-                  console.log("last < need");
+                  console.log("YES7A9 KTER MELI 3ANDEK");
 
-                  console.log(clientName + " = " + "need " + X);
+                  console.log("name " + clientName);
+                  console.log("QTE " + clientQTE);
+                  console.log("need " + X);
 
                   last = 0;
                 }
+
+                //               console.log("name " + clientName + " = " + need);
+                //
+                //               console.log("STOCK ");
+                //
+                //               setClients((prev) => [
+                //                 ...prev,
+                //                 { name: clientName, done: true, need: need },
+                //               ]);
+                // }
+              } else {
+                setModalVisibility(true);
               }
-            });
-          } else {
-            setModalVisibility(true);
+            }
           }
         },
         {
@@ -145,62 +228,7 @@ const ConsultScreen = ({ route }) => {
 
       if (data) {
         setISBN(data.ISBN);
-        //
-        //         setClients([]);
-        //
-        //         let total = data.ARRIVED_QTE;
-        //
-        //         let last = data.LAST;
-        //
-        //         let done = total - last;
-        //
-        //         let forCalculation = done;
-        //
-        //         console.log("LOOP");
-        //
-        //         data?.CLIENT.split("+").map((client) => {
-        //           let clientName = client.split("/")[1];
-        //
-        //           let clientQTE = client.split("/")[0];
-        //
-        //           if (forCalculation >= clientQTE) {
-        //             // if client got all his books
-        //             forCalculation -= clientQTE; // removing what he got
-        //
-        //             setClients((prev) => [
-        //               ...prev,
-        //               { name: clientName, qte: clientQTE, done: true, need: 0 },
-        //             ]);
-        //           } else if (forCalculation < clientQTE) {
-        //             // if he did not get all his books
-        //             let need = clientQTE - forCalculation; // calculating how much he need
-        //
-        //             forCalculation = 0;
-        //
-        //             if (last >= need) {
-        //               // if you have more books in your hand mor than he need or equal
-        //               setClients((prev) => [
-        //                 ...prev,
-        //                 { name: clientName, qte: clientQTE, done: false, need: need },
-        //               ]);
-        //
-        //               last -= need; // removing what he got
-        //             } else if (last < need) {
-        //               // if he need more than you have in your hand
-        //               // give him all what you have
-        //               setClients((prev) => [
-        //                 ...prev,
-        //                 { name: clientName, qte: clientQTE, done: false, need: last },
-        //               ]);
-        //
-        //               last = 0;
-        //             }
-        //           }
-        //         });
       }
-      // else {
-      //         setModalVisibility(true);
-      //       }
     });
   };
 
@@ -273,16 +301,38 @@ const ConsultScreen = ({ route }) => {
                   size = 2;
                 }
 
-                console.log(client);
+                if (clients.length > 1) {
+                  if (!client.done && client.need != 0) {
+                    let result = client.need;
 
-                if (!client.done && client.need != 0) {
-                  let result = client.need;
+                    return (
+                      <Result key={i} color="red" size={size}>
+                        {client.name + " = " + String(result)}
+                      </Result>
+                    );
+                  } else {
+                    return (
+                      <Result key={i} color="red" size={size}>
+                        Stock
+                      </Result>
+                    );
+                  }
+                } else {
+                  if (!clients[0].done) {
+                    let result = clients[0].need;
 
-                  return (
-                    <Result key={i} color="red" size={size}>
-                      {client.name + " = " + String(result)}
-                    </Result>
-                  );
+                    return (
+                      <Result key={i} color="red" size={size}>
+                        {clients[0].name + " = " + String(result)}
+                      </Result>
+                    );
+                  } else {
+                    return (
+                      <Result key={i} color="red" size={size}>
+                        Stock
+                      </Result>
+                    );
+                  }
                 }
                 return;
               })}
